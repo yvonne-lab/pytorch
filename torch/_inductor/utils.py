@@ -1463,12 +1463,13 @@ class DebugDirManager:
 
 
 def run_and_get_code(fn, *args, **kwargs) -> tuple[Any, List[str]]:
-    from .graph import GraphLowering
+    from .graph import GraphLowering, SaveOutputCodeContext
 
     source_codes: List[str] = []
 
-    def save_output_code(code: str):
-        source_codes.append(code)
+    def save_output_code(code: str, context: SaveOutputCodeContext):
+        if context == SaveOutputCodeContext.AFTER_COMPILE:
+            source_codes.append(code)
 
     with mock.patch.object(GraphLowering, "save_output_code", save_output_code):
         torch._dynamo.reset()
@@ -1495,12 +1496,13 @@ def run_fw_bw_and_get_code(fn):
 
 def get_code(fn, *args, **kwargs):
     """Get the inductor-generated code, but skip any actual compilation or running."""
-    from .graph import GraphLowering
+    from .graph import GraphLowering, SaveOutputCodeContext
 
     source_codes: List[str] = []
 
-    def save_output_code(code: str):
-        source_codes.append(code)
+    def save_output_code(code: str, context: SaveOutputCodeContext):
+        if context == SaveOutputCodeContext.AFTER_COMPILE:
+            source_codes.append(code)
 
     def patched_compile_to_module(self: GraphLowering):
         class DummyModule:
@@ -1518,7 +1520,7 @@ def get_code(fn, *args, **kwargs):
         )
         # Skip all the actual compiling.
         nonlocal save_output_code
-        save_output_code(code)
+        save_output_code(code, SaveOutputCodeContext.BEFORE_COMPILE)
 
         return DummyModule()
 
